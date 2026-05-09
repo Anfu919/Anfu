@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>🎂 生日快乐</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #ffd6e0, #ffb3ba, #ff8a80);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            overflow: hidden;
+            position: relative;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 飘落的彩带/纸屑 */
+        .confetti-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 15px;
+            border-radius: 3px;
+            opacity: 0.8;
+            animation: fall linear forwards;
+        }
+
+        @keyframes fall {
+            0% {
+                transform: translateY(-120px) rotate(0deg);
+                opacity: 0.9;
+            }
+            100% {
+                transform: translateY(105vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        .card {
+            background: rgba(255, 248, 245, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 40px;
+            padding: 40px 30px 35px;
+            max-width: 360px;
+            width: 85%;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.5);
+            text-align: center;
+            z-index: 20;
+            transition: transform 0.3s ease;
+        }
+
+        .card:active {
+            transform: scale(0.97);
+        }
+
+        .title {
+            font-size: 2.5em;
+            font-weight: 700;
+            background: linear-gradient(to right, #ef5350, #d81b60);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+            letter-spacing: 4px;
+        }
+
+        .sub {
+            color: #c06060;
+            font-size: 1.1em;
+            margin-bottom: 30px;
+            letter-spacing: 2px;
+            font-weight: 300;
+        }
+
+        .cake-area {
+            position: relative;
+            height: 200px;
+            margin: 20px 0 30px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        /* 蛋糕主体 */
+        .cake {
+            width: 180px;
+            position: relative;
+            transition: transform 0.7s cubic-bezier(0.25, 0.1, 0.15, 1.2);
+            transform: translateX(150px); /* 初始隐藏在右侧屏幕外 */
+            opacity: 0;
+        }
+
+        .cake.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .cake-layer {
+            width: 180px;
+            height: 45px;
+            background: #fdd9a6;
+            border-radius: 20px 20px 5px 5px;
+            position: relative;
+            margin: 0 auto;
+            box-shadow: 0 8px 0 #d49b6a, 0 10px 15px rgba(0,0,0,0.1);
+            border-bottom: 3px solid #c07c4a;
+        }
+
+        .cake-layer.top {
+            width: 140px;
+            height: 40px;
+            background: #ffe0b5;
+            margin-bottom: -8px;
+            border-radius: 15px 15px 5px 5px;
+            box-shadow: 0 6px 0 #d49b6a, 0 8px 12px rgba(0,0,0,0.1);
+            z-index: 2;
+            position: relative;
+        }
+
+        .cream {
+            position: absolute;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 145px;
+            height: 15px;
+            background: #fff5e6;
+            border-radius: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-around;
+            padding: 0 5px;
+        }
+
+        .cream-drip {
+            width: 10px;
+            height: 14px;
+            background: #fff5e6;
+            border-radius: 0 0 8px 8px;
+            margin-top: 8px;
+        }
+
+        /* 蜡烛 */
+        .candles {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            position: absolute;
+            top: -55px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+        }
+
+        .candle {
+            width: 14px;
+            height: 35px;
+            background: #ffcccb;
+            border-radius: 6px 6px 2px 2px;
+            position: relative;
+            box-shadow: inset -2px 0 0 rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+
+        .candle:nth-child(2) {
+            background: #ffe082;
+        }
+        .candle:nth-child(3) {
+            background: #b3e5fc;
+        }
+
+        .flame {
+            width: 14px;
+            height: 20px;
+            background: radial-gradient(circle, #fff9c4 5%, #ffb300 70%);
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            position: absolute;
+            top: -22px;
+            left: 0;
+            box-shadow: 0 0 18px #ff9800, 0 0 30px #ffa000;
+            animation: flicker 0.15s infinite alternate;
+        }
+
+        @keyframes flicker {
+            0% { transform: scaleY(1) scaleX(1); opacity: 0.9; }
+            100% { transform: scaleY(1.15) scaleX(0.9); opacity: 1; }
+        }
+
+        .btn {
+            background: #d81b60;
+            border: none;
+            color: white;
+            font-size: 1.3em;
+            font-weight: 600;
+            padding: 16px 40px;
+            border-radius: 50px;
+            letter-spacing: 4px;
+            cursor: pointer;
+            box-shadow: 0 12px 20px rgba(216, 27, 96, 0.3);
+            transition: all 0.25s ease;
+            margin-top: 10px;
+            width: 100%;
+            backdrop-filter: blur(5px);
+            background: rgba(216, 27, 96, 0.9);
+            border: 1px solid rgba(255,255,255,0.4);
+        }
+
+        .btn:active {
+            transform: scale(0.94);
+            background: #b71c4f;
+            box-shadow: 0 6px 12px rgba(183, 28, 79, 0.4);
+        }
+
+        .message {
+            margin-top: 20px;
+            color: #ad1457;
+            font-size: 1em;
+            font-weight: 400;
+            opacity: 0;
+            transition: opacity 0.8s ease;
+            min-height: 28px;
+        }
+
+        .message.show {
+            opacity: 1;
+        }
+
+        .footer {
+            margin-top: 18px;
+            color: #c48b7a;
+            font-size: 0.9em;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 彩带容器 -->
+    <div class="confetti-container" id="confettiContainer"></div>
+
+    <div class="card">
+        <div class="title">🎂</div>
+        <div class="sub">HAPPY BIRTHDAY</div>
+
+        <div class="cake-area">
+            <div class="cake" id="cake">
+                <!-- 蜡烛层 -->
+                <div class="candles">
+                    <div class="candle"><div class="flame"></div></div>
+                    <div class="candle"><div class="flame"></div></div>
+                    <div class="candle"><div class="flame"></div></div>
+                </div>
+                <!-- 上层蛋糕 -->
+                <div class="cake-layer top">
+                    <div class="cream">
+                        <span class="cream-drip"></span>
+                        <span class="cream-drip"></span>
+                        <span class="cream-drip"></span>
+                        <span class="cream-drip"></span>
+                        <span class="cream-drip"></span>
+                    </div>
+                </div>
+                <!-- 下层蛋糕 -->
+                <div class="cake-layer"></div>
+            </div>
+        </div>
+
+        <button class="btn" id="pushBtn">✨ 推蛋糕 ✨</button>
+        <div class="message" id="message">🥳 生日快乐！愿所有美好都如期而至～</div>
+        <div class="footer">— 专属于你的生日惊喜 —</div>
+    </div>
+
+    <script>
+        const cake = document.getElementById('cake');
+        const pushBtn = document.getElementById('pushBtn');
+        const message = document.getElementById('message');
+        const confettiContainer = document.getElementById('confettiContainer');
+
+        let cakePushed = false;
+
+        // 生成彩带函数
+        function createConfetti() {
+            const colors = ['#ff4d6d','#ffb347','#7ec8e3','#b39ddb','#ffd166','#ef767a','#84c7d0'];
+            for (let i = 0; i < 70; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.style.left = Math.random() * 100 + '%';
+                    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    confetti.style.width = (Math.random() * 12 + 6) + 'px';
+                    confetti.style.height = (Math.random() * 16 + 8) + 'px';
+                    confetti.style.animationDuration = (Math.random() * 2.5 + 2) + 's';
+                    confetti.style.animationDelay = (Math.random() * 0.8) + 's';
+                    confettiContainer.appendChild(confetti);
+
+                    // 自动清除彩带
+                    setTimeout(() => {
+                        confetti.remove();
+                    }, 3800);
+                }, i * 15);
+            }
+        }
+
+        // 推蛋糕事件
+        pushBtn.addEventListener('click', () => {
+            if (cakePushed) {
+                // 已推出仍可以再放彩带
+                createConfetti();
+                message.textContent = '🎉 再祝你快乐，不止生日！🎉';
+                message.classList.add('show');
+                return;
+            }
+
+            // 第一次推：蛋糕滑出，显示祝福
+            cake.classList.add('show');
+            message.classList.add('show');
+            pushBtn.textContent = '🎁 再来一次祝福';
+            cakePushed = true;
+
+            // 撒彩带
+            createConfetti();
+
+            // 播放简单的震动反馈（如果支持）
+            if (window.navigator && window.navigator.vibrate) {
+                window.navigator.vibrate(30);
+            }
+        });
+
+        // 额外：点击蛋糕也可以触发彩带（小彩蛋）
+        cake.addEventListener('click', () => {
+            if (cakePushed) {
+                createConfetti();
+            }
+        });
+    </script>
+</body>
+</html>
