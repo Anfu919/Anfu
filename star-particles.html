@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>指尖星团 · 灵动粒子</title>
+    <style>
+        :root {
+            --bg: #030a1a;
+            --surface: rgba(10, 20, 40, 0.72);
+            --glow-blue: #5b9bd5;
+            --dream-purple: #9b7ec4;
+            --text: #d0d8f0;
+            --text-soft: #90a0c0;
+            --border: rgba(80, 120, 200, 0.25);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+            --radius: 18px;
+            --transition: 0.3s ease;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--bg);
+            overflow: hidden;
+            font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: pan-x pan-y; /* 允许浏览器处理手势，但我们会在内部拦截 */
+            height: 100vh;
+            width: 100vw;
+            cursor: crosshair;
+            color: var(--text);
+        }
+        #canvas-container { position: fixed; inset: 0; z-index: 1; }
+        canvas { display: block; }
+
+        .ambient-glow {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background:
+                radial-gradient(ellipse at 50% 40%, rgba(30, 80, 180, 0.12) 0%, transparent 60%),
+                radial-gradient(ellipse at 30% 70%, rgba(120, 50, 170, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 30%, rgba(50, 120, 220, 0.08) 0%, transparent 50%);
+        }
+
+        .status-bar {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 10;
+            pointer-events: none; display: flex; align-items: center; gap: 10px;
+            background: rgba(5, 15, 30, 0.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border); border-radius: 30px; padding: 8px 20px;
+            font-size: 13px; letter-spacing: 0.5px; color: var(--text-soft);
+        }
+        .status-bar .dot {
+            width: 8px; height: 8px; border-radius: 50%; background: var(--glow-blue);
+            box-shadow: 0 0 12px var(--glow-blue); transition: all 0.5s;
+        }
+        .status-bar .dot.scattered { background: var(--dream-purple); }
+        .status-bar .dot.infinity { background: #d070a0; }
+
+        .ui-panel {
+            position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 10;
+            display: flex; gap: 8px; background: var(--surface); backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 50px;
+            padding: 6px 12px; box-shadow: var(--shadow); flex-wrap: wrap; justify-content: center;
+            pointer-events: auto;
+        }
+        .ui-panel button {
+            background: rgba(20, 40, 70, 0.7); border: 1px solid rgba(255,255,255,0.1); color: var(--text);
+            padding: 8px 14px; border-radius: 30px; cursor: pointer; font-size: 12px; font-weight: 500;
+            letter-spacing: 0.3px; transition: all var(--transition); white-space: nowrap;
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); font-family: inherit; outline: none;
+            pointer-events: auto;
+        }
+        .ui-panel button:hover {
+            background: rgba(40, 70, 120, 0.8); border-color: rgba(150,180,255,0.4);
+            box-shadow: 0 4px 20px rgba(70,120,200,0.3); color: #fff;
+        }
+        .ui-panel button.active-shape {
+            background: rgba(80, 50, 140, 0.8); border-color: rgba(180,140,220,0.6);
+            box-shadow: 0 0 20px rgba(120,70,200,0.5); color: #fff; font-weight: 600;
+        }
+        .ui-panel button .icon { margin-right: 4px; font-size: 14px; }
+
+        .corner-btns {
+            position: fixed; top: 20px; right: 20px; z-index: 10; display: flex; gap: 10px;
+        }
+        .icon-btn {
+            background: var(--surface); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border); color: #ccc; width: 40px; height: 40px; border-radius: 50%;
+            cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center;
+            transition: all var(--transition); box-shadow: var(--shadow); font-family: inherit; outline: none;
+            pointer-events: auto;
+        }
+        .icon-btn:hover { color: #fff; border-color: rgba(200,200,255,0.4); box-shadow: 0 6px 24px rgba(80,100,200,0.4); }
+
+        .settings-modal {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0);
+            z-index: 100; background: rgba(5,12,28,0.96); backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px); border: 1px solid var(--border); border-radius: 24px;
+            padding: 24px 20px; width: 90%; max-width: 360px; box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+            transition: transform 0.35s cubic-bezier(0.4,0,0.2,1); color: var(--text);
+            pointer-events: auto;
+        }
+        .settings-modal.open { transform: translate(-50%, -50%) scale(1); }
+        .settings-modal h3 { font-size: 18px; font-weight: 600; margin-bottom: 18px; color: #fff; text-align: center; }
+        .close-btn {
+            position: absolute; top: 10px; right: 16px; background: none; border: none; color: #888;
+            font-size: 22px; cursor: pointer;
+        }
+        .close-btn:hover { color: #fff; }
+        .settings-row {
+            display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 12px;
+        }
+        .settings-row label { font-size: 12px; color: var(--text-soft); }
+        .settings-row input[type="range"] { flex: 1; accent-color: var(--dream-purple); }
+        .settings-row .val { font-size: 12px; min-width: 28px; text-align: right; }
+        .music-control {
+            display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 12px;
+            background: rgba(20,40,70,0.5); border-radius: 16px;
+        }
+        .music-btn {
+            background: rgba(80,60,140,0.7); border: none; color: #fff; width: 38px; height: 38px;
+            border-radius: 50%; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .music-btn:hover { background: rgba(120,90,200,0.8); }
+        .music-info { font-size: 11px; color: var(--text-soft); flex: 1; }
+        .hint {
+            position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); z-index: 5;
+            pointer-events: none; font-size: 11px; color: rgba(180,190,220,0.7); text-align: center;
+            transition: opacity 0.8s;
+        }
+
+        @media (max-width: 640px) {
+            .ui-panel { gap: 4px; padding: 5px 8px; border-radius: 36px; bottom: 16px; }
+            .ui-panel button { padding: 6px 10px; font-size: 11px; border-radius: 24px; }
+            .settings-modal { width: 95%; padding: 18px 14px; }
+        }
+    </style>
+</head>
+<body>
+<div class="ambient-glow"></div>
+<div id="canvas-container"></div>
+
+<div class="status-bar">
+    <span class="dot scattered" id="statusDot"></span>
+    <span id="statusText">松手散开 · 按住聚拢</span>
+</div>
+
+<div class="corner-btns">
+    <button class="icon-btn" id="settingsBtn" title="设置">⚙</button>
+    <button class="icon-btn" id="fullscreenBtn" title="全屏">⛶</button>
+</div>
+
+<div class="ui-panel" id="uiPanel">
+    <button class="active-shape" data-shape="heart"><span class="icon">♥</span>爱心</button>
+    <button data-shape="star"><span class="icon">★</span>星星</button>
+    <button data-shape="diamond"><span class="icon">◇</span>钻石</button>
+    <button data-shape="sphere"><span class="icon">●</span>圆球</button>
+    <button data-shape="torus"><span class="icon">◎</span>甜甜圈</button>
+    <button data-shape="cube"><span class="icon">◆</span>立方体</button>
+    <button data-shape="infinity"><span class="icon">∞</span>无穷</button>
+</div>
+
+<div class="settings-modal" id="settingsModal">
+    <button class="close-btn" id="closeSettings">✕</button>
+    <h3>✨ 指尖星团 · 设置</h3>
+    <div class="settings-row">
+        <label>粒子大小</label>
+        <input type="range" id="modalSizeSlider" min="3" max="18" value="7" step="0.5">
+        <span class="val" id="modalSizeVal">7</span>
+    </div>
+    <div class="settings-row">
+        <label>跟随强度</label>
+        <input type="range" id="attractionSlider" min="20" max="100" value="100" step="1">
+        <span class="val" id="attractionVal">100</span>
+    </div>
+    <div class="settings-row">
+        <label>散落粒子比例</label>
+        <input type="range" id="scatterRatioSlider" min="0" max="50" value="25" step="1">
+        <span class="val" id="scatterRatioVal">25</span>
+    </div>
+    <div class="music-control">
+        <button class="music-btn" id="musicPlayBtn">▶</button>
+        <span class="music-info" id="musicInfo">Divine Failure</span>
+        <input type="range" id="volumeSlider" min="0" max="100" value="70" style="width:70px;">
+    </div>
+</div>
+
+<div class="hint" id="hint">🖐 按住屏幕聚拢粒子 · 移动手指整体跟随 · 画圈可变∞</div>
+
+<script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+
+    // ========== DOM 引用 ==========
+    const shapeButtons = document.querySelectorAll('#uiPanel button[data-shape]');
+    const modalSizeSlider = document.getElementById('modalSizeSlider');
+    const modalSizeVal = document.getElementById('modalSizeVal');
+    const attractionSlider = document.getElementById('attractionSlider');
+    const attractionVal = document.getElementById('attractionVal');
+    const scatterRatioSlider = document.getElementById('scatterRatioSlider');
+    const scatterRatioVal = document.getElementById('scatterRatioVal');
+    const settingsModal = document.getElementById('settingsModal');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const closeSettings = document.getElementById('closeSettings');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const hint = document.getElementById('hint');
+    const musicPlayBtn = document.getElementById('musicPlayBtn');
+    const musicInfo = document.getElementById('musicInfo');
+    const volumeSlider = document.getElementById('volumeSlider');
+
+    // ========== 音频 ==========
+    const audioSources = [
+        'https://music.163.com/song/media/outer/url?id=2036701536.mp3',
+        'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
+    ];
+    let audio = null;
+    let audioIndex = 0;
+    const initAudio = (index = 0) => {
+        if (audio) { audio.pause(); audio.src = ''; }
+        audio = new Audio(audioSources[index]);
+        audio.loop = true;
+        audio.volume = parseFloat(volumeSlider.value) / 100;
+        audio.addEventListener('error', () => {
+            if (audioIndex < audioSources.length - 1) {
+                audioIndex++;
+                initAudio(audioIndex);
+                musicInfo.textContent = 'Divine Failure (备用)';
+                if (!audio.paused) audio.play().catch(() => {});
+            } else {
+                musicInfo.textContent = '音乐加载失败';
+            }
+        });
+        audio.addEventListener('play', () => { musicPlayBtn.textContent = '⏸'; });
+        audio.addEventListener('pause', () => { musicPlayBtn.textContent = '▶'; });
+        musicPlayBtn.textContent = '▶';
+        musicInfo.textContent = 'Divine Failure';
+    };
+    initAudio();
+
+    musicPlayBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!audio) return;
+        if (audio.paused) {
+            audio.play().catch(() => {});
+        } else {
+            audio.pause();
+        }
+    });
+    volumeSlider.addEventListener('input', () => {
+        if (audio) audio.volume = parseFloat(volumeSlider.value) / 100;
+    });
+
+    // ========== Three.js 场景 ==========
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x030a1a, 0.0002);
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 60);
+    camera.position.set(0, 0.2, 8.5);
+    camera.lookAt(0, 0, 0);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x030a1a, 1);
+    document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+    // 发光纹理
+    const createGlowTexture = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 128;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+        g.addColorStop(0, 'rgba(220,240,255,1)');
+        g.addColorStop(0.05, 'rgba(180,210,255,0.9)');
+        g.addColorStop(0.15, 'rgba(100,150,230,0.6)');
+        g.addColorStop(0.35, 'rgba(60,90,180,0.2)');
+        g.addColorStop(0.7, 'rgba(20,30,80,0.03)');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, 128, 128);
+        return new THREE.CanvasTexture(canvas);
+    };
+    const glowTexture = createGlowTexture();
+
+    // ========== 粒子系统 ==========
+    const PARTICLE_COUNT = 2400;
+    let particleSize = 0.07;
+    let followStrength = 1.0;
+    let scatterRatio = 0.25; // 聚拢时散落粒子的比例
+    let currentShape = 'heart';
+    let isGathered = false;
+    let isPressed = false;
+    let systemCenter = new THREE.Vector3(0, 0, 0);
+    let particleGeometry, particleMaterial, particleSystem;
+    let targetPositions = [];
+    let previousPositions = [];
+    let transitionActive = false;
+    let transitionStartTime = 0;
+    const TRANSITION_DURATION = 1800;
+
+    const scatterBase = [];
+    const shapeBaseCache = {};
+
+    const initParticleSystem = () => {
+        if (particleSystem) {
+            scene.remove(particleSystem);
+            particleGeometry.dispose();
+            particleMaterial.dispose();
+        }
+        particleGeometry = new THREE.BufferGeometry();
+        const posArr = new Float32Array(PARTICLE_COUNT * 3);
+        const colArr = new Float32Array(PARTICLE_COUNT * 3);
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+            posArr[i * 3] = (Math.random() - 0.5) * 8;
+            posArr[i * 3 + 1] = (Math.random() - 0.5) * 8;
+            posArr[i * 3 + 2] = (Math.random() - 0.5) * 8;
+            const hue = 0.55 + Math.random() * 0.18;
+            const sat = 0.6 + Math.random() * 0.4;
+            const light = 0.35 + Math.random() * 0.45;
+            const c = new THREE.Color();
+            c.setHSL(hue, sat, light);
+            colArr[i * 3] = c.r;
+            colArr[i * 3 + 1] = c.g;
+            colArr[i * 3 + 2] = c.b;
+        }
+        particleGeometry.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+        particleGeometry.setAttribute('color', new THREE.BufferAttribute(colArr, 3));
+        particleMaterial = new THREE.PointsMaterial({
+            size: particleSize,
+            map: glowTexture,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            depthTest: true,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.9,
+            sizeAttenuation: true,
+        });
+        particleSystem = new THREE.Points(particleGeometry, particleMaterial);
+        scene.add(particleSystem);
+        buildAllBases();
+        targetPositions = scatterBase.map(p => ({ x: p.x + systemCenter.x, y: p.y + systemCenter.y, z: p.z + systemCenter.z }));
+        previousPositions = [...targetPositions];
+        updateAllPositions(targetPositions);
+    };
+
+    const updateAllPositions = (arr) => {
+        const pos = particleGeometry.attributes.position;
+        for (let i = 0; i < arr.length; i++) pos.setXYZ(i, arr[i].x, arr[i].y, arr[i].z);
+        pos.needsUpdate = true;
+    };
+
+    const fibonacciSphere = (n, R) => {
+        const pts = [];
+        const phi = Math.PI * (3 - Math.sqrt(5));
+        for (let i = 0; i < n; i++) {
+            const y = 1 - (i / (n - 1)) * 2;
+            const rAtY = Math.sqrt(1 - y * y);
+            const theta = phi * i;
+            pts.push({
+                x: Math.cos(theta) * rAtY * R,
+                y: y * R,
+                z: Math.sin(theta) * rAtY * R,
+            });
+        }
+        return pts;
+    };
+
+    const buildAllBases = () => {
+        const R = 2.6;
+        const spherePts = fibonacciSphere(PARTICLE_COUNT, R);
+        shapeBaseCache['heart'] = spherePts.map(p => {
+            const { x, y, z } = p;
+            const r = Math.sqrt(x * x + y * y + z * z);
+            const nx = x / r, ny = y / r, nz = z / r;
+            const theta = Math.acos(ny), phi2 = 2 * Math.atan2(nz, nx);
+            const deform = 1 + 0.28 * Math.sin(theta) ** 2 * Math.cos(phi2) - 0.32 * Math.cos(theta);
+            return { x: nx * R * deform, y: ny * R * deform, z: nz * R * deform };
+        });
+        shapeBaseCache['star'] = spherePts.map(p => {
+            const a = Math.atan2(p.z, p.x);
+            const s = 0.75 + 0.25 * Math.cos(5 * a);
+            return { x: p.x * s, y: p.y * 0.85, z: p.z * s };
+        });
+        shapeBaseCache['diamond'] = spherePts.map(p => {
+            const sum = Math.abs(p.x) + Math.abs(p.y) + Math.abs(p.z);
+            const s = R / sum;
+            return { x: p.x * s, y: p.y * s, z: p.z * s };
+        });
+        shapeBaseCache['sphere'] = spherePts.map(p => ({ x: p.x, y: p.y, z: p.z }));
+        shapeBaseCache['torus'] = Array.from({ length: PARTICLE_COUNT }, () => {
+            const u = Math.random() * Math.PI * 2;
+            const v = Math.random() * Math.PI * 2;
+            const Rr = 1.8, rt = 0.7;
+            return {
+                x: (Rr + rt * Math.cos(v)) * Math.cos(u),
+                y: (Rr + rt * Math.cos(v)) * Math.sin(u),
+                z: rt * Math.sin(v),
+            };
+        });
+        shapeBaseCache['cube'] = Array.from({ length: PARTICLE_COUNT }, () => {
+            const face = Math.floor(Math.random() * 6);
+            const u = (Math.random() - 0.5) * 3.2, v = (Math.random() - 0.5) * 3.2;
+            const half = 1.6;
+            if (face === 0) return { x: half, y: u, z: v };
+            if (face === 1) return { x: -half, y: u, z: v };
+            if (face === 2) return { x: u, y: half, z: v };
+            if (face === 3) return { x: u, y: -half, z: v };
+            if (face === 4) return { x: u, y: v, z: half };
+            return { x: u, y: v, z: -half };
+        });
+        shapeBaseCache['infinity'] = Array.from({ length: PARTICLE_COUNT }, () => {
+            const t = Math.random() * Math.PI * 2;
+            const scale = 2.3;
+            const x = scale * Math.sin(t);
+            const y = scale * Math.sin(2 * t) * 0.5;
+            const z = (Math.random() - 0.5) * 0.6;
+            return { x, y, z };
+        });
+
+        scatterBase.length = 0;
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+            const r = 8 * Math.cbrt(Math.random());
+            const theta = Math.acos(2 * Math.random() - 1);
+            const phi = Math.random() * Math.PI * 2;
+            scatterBase.push({
+                x: r * Math.sin(theta) * Math.cos(phi),
+                y: r * Math.sin(theta) * Math.sin(phi),
+                z: r * Math.cos(theta),
+            });
+        }
+    };
+
+    const startTransition = (targets) => {
+        previousPositions = [];
+        const pos = particleGeometry.attributes.position;
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+            previousPositions.push({ x: pos.getX(i), y: pos.getY(i), z: pos.getZ(i) });
+        }
+        targetPositions = targets;
+        transitionStartTime = performance.now();
+        transitionActive = true;
+    };
+
+    const easeInOutCubic = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+    const screenToWorld = (ndcX, ndcY) => {
+        const vec = new THREE.Vector3(ndcX, ndcY, 0.5);
+        vec.unproject(camera);
+        const dir = vec.sub(camera.position).normalize();
+        const t = -camera.position.z / dir.z;
+        return camera.position.clone().add(dir.multiplyScalar(t));
+    };
+
+    // ========== 手势识别 ==========
+    let gesturePoints = [];
+    const resetGesture = () => { gesturePoints = []; };
+    const addGesturePoint = (x, y) => {
+        gesturePoints.push({ x, y, time: performance.now() });
+        if (gesturePoints.length > 60) gesturePoints.shift();
+    };
+    const detectCircle = () => {
+        if (gesturePoints.length < 15) return false;
+        const pts = gesturePoints;
+        let cx = 0, cy = 0;
+        pts.forEach(p => { cx += p.x; cy += p.y; });
+        cx /= pts.length; cy /= pts.length;
+        const dists = pts.map(p => Math.hypot(p.x - cx, p.y - cy));
+        const mean = dists.reduce((a, b) => a + b) / dists.length;
+        const variance = dists.reduce((s, d) => s + (d - mean) ** 2, 0) / dists.length;
+        const std = Math.sqrt(variance);
+        if (std / mean > 0.35) return false;
+        const first = pts[0], last = pts[pts.length - 1];
+        if (Math.hypot(last.x - first.x, last.y - first.y) > Math.max(...dists) * 0.4) return false;
+        let totalAngle = 0;
+        for (let i = 2; i < pts.length; i++) {
+            const ax = pts[i - 1].x - pts[i - 2].x, ay = pts[i - 1].y - pts[i - 2].y;
+            const bx = pts[i].x - pts[i - 1].x, by = pts[i].y - pts[i - 1].y;
+            totalAngle += Math.atan2(ax * by - ay * bx, ax * bx + ay * by);
+        }
+        return Math.abs(totalAngle) > 4.5 && mean > 30;
+    };
+
+    // ========== 事件处理 ==========
+    const isUIElement = (target) => {
+        return target.closest('button') || target.closest('input') || target.closest('#settingsModal');
+    };
+
+    const getEventPos = (e) => {
+        if (e.touches) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        return { x: e.clientX, y: e.clientY };
+    };
+
+    let prevFingerWorld = new THREE.Vector3();
+
+    const onPointerDown = (e) => {
+        if (isUIElement(e.target)) return;
+        e.preventDefault();
+        const pos = getEventPos(e);
+        const ndcX = (pos.x / window.innerWidth) * 2 - 1;
+        const ndcY = -(pos.y / window.innerHeight) * 2 + 1;
+        prevFingerWorld.copy(screenToWorld(ndcX, ndcY));
+        resetGesture();
+        addGesturePoint(pos.x, pos.y);
+        isPressed = true;
+        if (!isGathered) {
+            const shapeBase = shapeBaseCache[currentShape];
+            const targets = shapeBase.map(p => ({ x: p.x + systemCenter.x, y: p.y + systemCenter.y, z: p.z + systemCenter.z }));
+            startTransition(targets);
+            isGathered = true;
+            statusDot.className = 'dot';
+            statusText.textContent = '按住移动 · ' + getShapeName();
+        }
+    };
+
+    const onPointerMove = (e) => {
+        if (!isPressed) return;
+        e.preventDefault();
+        const pos = getEventPos(e);
+        addGesturePoint(pos.x, pos.y);
+        const ndcX = (pos.x / window.innerWidth) * 2 - 1;
+        const ndcY = -(pos.y / window.innerHeight) * 2 + 1;
+        const currWorld = screenToWorld(ndcX, ndcY);
+        const delta = new THREE.Vector3().subVectors(currWorld, prevFingerWorld).multiplyScalar(followStrength);
+        systemCenter.add(delta);
+        prevFingerWorld.copy(currWorld);
+    };
+
+    const onPointerUp = (e) => {
+        if (!isPressed) return;
+        e.preventDefault();
+        isPressed = false;
+        const isCircle = detectCircle();
+        if (isCircle) {
+            currentShape = 'infinity';
+            updateShapeButtons();
+            const shapeBase = shapeBaseCache['infinity'];
+            const targets = shapeBase.map(p => ({ x: p.x + systemCenter.x, y: p.y + systemCenter.y, z: p.z + systemCenter.z }));
+            startTransition(targets);
+            isGathered = true;
+            statusDot.className = 'dot infinity';
+            statusText.textContent = '∞ 无穷符号';
+        } else {
+            const targets = scatterBase.map(p => ({ x: p.x + systemCenter.x, y: p.y + systemCenter.y, z: p.z + systemCenter.z }));
+            startTransition(targets);
+            isGathered = false;
+            statusDot.className = 'dot scattered';
+            statusText.textContent = '松手散开 · 按住聚拢';
+        }
+        resetGesture();
+    };
+
+    window.addEventListener('touchstart', onPointerDown, { passive: false });
+    window.addEventListener('touchmove', onPointerMove, { passive: false });
+    window.addEventListener('touchend', onPointerUp);
+    window.addEventListener('touchcancel', onPointerUp);
+    window.addEventListener('mousedown', onPointerDown);
+    window.addEventListener('mousemove', (e) => { if (isPressed) onPointerMove(e); });
+    window.addEventListener('mouseup', onPointerUp);
+    window.addEventListener('mouseleave', onPointerUp);
+
+    // ========== UI 交互 ==========
+    const getShapeName = () => {
+        const map = { heart:'爱心', star:'星星', diamond:'钻石', sphere:'圆球', torus:'甜甜圈', cube:'立方体', infinity:'无穷' };
+        return map[currentShape] || currentShape;
+    };
+    const updateShapeButtons = () => {
+        shapeButtons.forEach(btn => btn.classList.toggle('active-shape', btn.dataset.shape === currentShape));
+    };
+    shapeButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const shape = btn.dataset.shape;
+            if (currentShape === shape && isGathered) return;
+            currentShape = shape;
+            updateShapeButtons();
+            if (isGathered) {
+                const shapeBase = shapeBaseCache[currentShape];
+                const targets = shapeBase.map(p => ({ x: p.x + systemCenter.x, y: p.y + systemCenter.y, z: p.z + systemCenter.z }));
+                startTransition(targets);
+                statusText.textContent = '按住移动 · ' + getShapeName();
+            }
+        });
+        btn.addEventListener('mousedown', e => e.stopPropagation());
+        btn.addEventListener('touchstart', e => e.stopPropagation());
+    });
+
+    // 设置面板
+    settingsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        settingsModal.classList.toggle('open');
+    });
+    closeSettings.addEventListener('click', () => settingsModal.classList.remove('open'));
+    settingsModal.addEventListener('click', e => e.stopPropagation());
+    document.addEventListener('click', () => settingsModal.classList.remove('open'));
+
+    fullscreenBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+            fullscreenBtn.textContent = '⛶';
+        } else {
+            document.body.requestFullscreen().catch(() => {});
+            fullscreenBtn.textContent = '⛝';
+        }
+    });
+    document.addEventListener('fullscreenchange', () => {
+        fullscreenBtn.textContent = document.fullscreenElement ? '⛝' : '⛶';
+    });
+
+    // 滑块
+    modalSizeSlider.addEventListener('input', () => {
+        particleSize = parseFloat(modalSizeSlider.value) / 100;
+        modalSizeVal.textContent = modalSizeSlider.value;
+        if (particleMaterial) particleMaterial.size = particleSize;
+    });
+    attractionSlider.addEventListener('input', () => {
+        followStrength = parseInt(attractionSlider.value) / 100;
+        attractionVal.textContent = attractionSlider.value;
+    });
+    scatterRatioSlider.addEventListener('input', () => {
+        scatterRatio = parseInt(scatterRatioSlider.value) / 100;
+        scatterRatioVal.textContent = scatterRatioSlider.value;
+    });
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // 键盘
+    window.addEventListener('keydown', e => {
+        const keys = ['1','2','3','4','5','6','7'];
+        const shapes = ['heart','star','diamond','sphere','torus','cube','infinity'];
+        const idx = keys.indexOf(e.key);
+        if (idx >= 0) {
+            currentShape = shapes[idx];
+            updateShapeButtons();
+            if (isGathered) {
+                const shapeBase = shapeBaseCache[currentShape];
+                const targets = shapeBase.map(p => ({ x: p.x + systemCenter.x, y: p.y + systemCenter.y, z: p.z + systemCenter.z }));
+                startTransition(targets);
+                statusText.textContent = '按住移动 · ' + getShapeName();
+            }
+        }
+        if (e.key === 'f' && !e.ctrlKey && !e.metaKey) fullscreenBtn.click();
+    });
+
+    // ========== 动画循环 ==========
+    const clock = new THREE.Clock();
+    let globalTime = 0;
+    const coreCount = () => Math.floor(PARTICLE_COUNT * (1 - scatterRatio));
+
+    const animate = (ts) => {
+        requestAnimationFrame(animate);
+        const dt = Math.min(clock.getDelta(), 0.1);
+        globalTime += dt;
+
+        const pos = particleGeometry.attributes.position;
+        if (transitionActive) {
+            const elapsed = ts - transitionStartTime;
+            let t = Math.min(elapsed / TRANSITION_DURATION, 1);
+            t = easeInOutCubic(t);
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                const from = previousPositions[i];
+                const to = targetPositions[i];
+                pos.setXYZ(i,
+                    from.x + (to.x - from.x) * t,
+                    from.y + (to.y - from.y) * t,
+                    from.z + (to.z - from.z) * t
+                );
+            }
+            if (t >= 1) {
+                transitionActive = false;
+                for (let i = 0; i < PARTICLE_COUNT; i++) pos.setXYZ(i, targetPositions[i].x, targetPositions[i].y, targetPositions[i].z);
+            }
+        } else {
+            const base = isGathered ? shapeBaseCache[currentShape] : scatterBase;
+            const coreNum = isGathered ? coreCount() : PARTICLE_COUNT;
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                const bp = base[i];
+                let px = bp.x + systemCenter.x;
+                let py = bp.y + systemCenter.y;
+                let pz = bp.z + systemCenter.z;
+                if (isGathered) {
+                    if (i < coreNum) {
+                        // 核心粒子紧密跟随，加微小浮动
+                        const osc = 0.012;
+                        px += osc * Math.sin(globalTime * 3 + i * 0.4);
+                        py += osc * Math.cos(globalTime * 2.5 + i * 0.5);
+                        pz += osc * Math.sin(globalTime * 2 + i * 0.6);
+                    } else {
+                        // 外围散落粒子，随机偏移较大
+                        const amp = 1.2 + 0.6 * Math.sin(globalTime * 1.5 + i);
+                        const angle = i * 2.3 + globalTime * 0.8;
+                        px += Math.cos(angle) * amp;
+                        py += Math.sin(angle * 1.3) * amp * 0.7;
+                        pz += Math.sin(angle) * amp * 0.7;
+                    }
+                } else {
+                    // 散开状态加细微漂移
+                    const osc = 0.025;
+                    px += osc * Math.sin(globalTime * 2 + i * 0.7);
+                    py += osc * Math.cos(globalTime * 1.7 + i * 0.8);
+                    pz += osc * Math.sin(globalTime * 1.4 + i * 0.9);
+                }
+                pos.setXYZ(i, px, py, pz);
+            }
+        }
+        pos.needsUpdate = true;
+        renderer.render(scene, camera);
+
+        if (globalTime > 6 && hint.style.opacity > 0.2) {
+            hint.style.opacity = String(Math.max(0.2, parseFloat(hint.style.opacity) - dt * 0.06));
+        }
+    };
+
+    // ========== 启动 ==========
+    initParticleSystem();
+    updateShapeButtons();
+    modalSizeVal.textContent = modalSizeSlider.value;
+    attractionVal.textContent = attractionSlider.value;
+    scatterRatioVal.textContent = scatterRatioSlider.value;
+    statusDot.className = 'dot scattered';
+    statusText.textContent = '松手散开 · 按住聚拢';
+    requestAnimationFrame(animate);
+    console.log('✨ 指尖星团已就绪 | 按住移动粒子团 | 按钮已修复 | 音乐可播放');
+</script>
+</body>
+</html>
